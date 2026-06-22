@@ -84,75 +84,88 @@ def run_autoencoder_training(size=32, latent_dim=128):
     config = load_experiment_config("configs/default.yaml", "configs/autoencoder.yaml")
     set_seed(42)
     
+    # --- Repository Structure Validation ---
+    required_dirs = ["configs", "src", "reports", "logs", "checkpoints"]
+    for d in required_dirs:
+        if not os.path.isdir(d):
+            print(f"ERROR: Required directory '{d}/' is missing. Aborting.")
+            return None
+    
     # --- Research Smoke Test ---
-    train_matrix_type = config['data'].get('matrix_type', 'low_rank')
+    matrix_type = config['data'].get('matrix_type', 'low_rank')
     smoke_passed = run_research_smoke_test(
         size=size,
         latent_dim=latent_dim,
-        matrix_type=train_matrix_type,
+        matrix_type=matrix_type,
         rank=4
     )
     if not smoke_passed:
         print("\nABORTING: Smoke test failed. Fix issues above before launching full training.")
         return None
     
+    # --- Device Auto Detection ---
+    device_config = config.get("device", "auto")
+    if device_config == "auto":
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    else:
+        device = torch.device(device_config)
+    
+    print(f"\nUsing device: {device}")
+    
     # --- GPU Diagnostics ---
     print("\n--- GPU Diagnostics ---")
     print(f"CUDA Available : {torch.cuda.is_available()}")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if torch.cuda.is_available():
-        print(f"GPU : {torch.cuda.get_device_name(0)}")
-        print(f"GPU Memory : {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+        print(f"GPU            : {torch.cuda.get_device_name(0)}")
+        print(f"GPU Memory     : {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
     else:
         print("WARNING: CUDA is not available. Training will be slow on CPU.")
     
-    val_matrix_type = config['data'].get('matrix_type', 'low_rank')
-    
     # --- Experiment Metadata Logging ---
+    compression_ratio = (size * size) / latent_dim
     print("\n" + "=" * 60)
     print("Autoencoder Experiment Configuration")
     print("=" * 60)
-    print(f"Train Matrix Type      : {train_matrix_type}")
-    print(f"Validation Matrix Type : {val_matrix_type}")
+    print(f"Matrix Type            : {matrix_type}")
     print(f"Matrix Size            : {size}x{size}")
     print(f"Latent Dimension       : {latent_dim}")
     print(f"Train Samples          : {config['data']['train_samples']}")
     print(f"Validation Samples     : {config['data']['val_samples']}")
     print(f"Batch Size             : {config['data']['batch_size']}")
     print(f"Learning Rate          : {config['training']['learning_rate']}")
+    print(f"Compression Ratio      : {compression_ratio:.2f}x")
     print(f"Device                 : {device}")
     print("=" * 60)
 
     # --- Dataset Diagnostics ---
     print("\n--- Dataset Diagnostics ---")
-    sample_dataset = DynamicMatrixDataset(1, size=size, matrix_type=train_matrix_type)
+    sample_dataset = DynamicMatrixDataset(1, size=size, matrix_type=matrix_type)
     sample_A = sample_dataset[0]['A']
     print(f"Mean : {sample_A.mean().item():.6f}")
     print(f"Std  : {sample_A.std().item():.6f}")
     print(f"Min  : {sample_A.min().item():.6f}")
     print(f"Max  : {sample_A.max().item():.6f}")
 
-    if train_matrix_type == "low_rank":
+    if matrix_type == "low_rank":
         print(f"Numerical Rank : {torch.linalg.matrix_rank(sample_A).item()}")
         
         # --- Matrix Structure Analysis ---
         U, S, V = torch.linalg.svd(sample_A)
-        print(f"Effective Rank : {(S > 1e-5).sum().item()}")
-        print(f"Largest Singular Value : {S[0].item():.6f}")
-        print(f"Smallest Singular Value: {S[-1].item():.6f}")
+        print(f"Largest Singular Value  : {S[0].item():.6f}")
+        print(f"Smallest Singular Value : {S[-1].item():.6f}")
         cond = S[0] / S[-1] if S[-1] > 0 else float('inf')
-        print(f"Condition Number : {cond:.6f}")
+        print(f"Condition Number        : {cond:.6f}")
 
     # --- Compression Statistics ---
     original_values = size * size
     print("\n--- Compression Statistics ---")
-    print(f"Original Values : {original_values}")
-    print(f"Latent Values : {latent_dim}")
-    print(f"Compression Ratio : {original_values / latent_dim:.2f}x")
+    print(f"Original Values   : {original_values}")
+    print(f"Latent Values     : {latent_dim}")
+    print(f"Compression Ratio : {compression_ratio:.2f}x")
     print("-" * 30 + "\n")
 
-    train_dataset = DynamicMatrixDataset(config['data']['train_samples'], size=size, matrix_type=train_matrix_type)
-    val_dataset = DynamicMatrixDataset(config['data']['val_samples'], size=size, matrix_type=val_matrix_type)
+    train_dataset = DynamicMatrixDataset(config['data']['train_samples'], size=size, matrix_type=matrix_type)
+    val_dataset = DynamicMatrixDataset(config['data']['val_samples'], size=size, matrix_type=matrix_type)
     
     train_loader = DataLoader(train_dataset, batch_size=config['data']['batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=config['data']['batch_size'], shuffle=False)

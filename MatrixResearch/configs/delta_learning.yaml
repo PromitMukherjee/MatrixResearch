@@ -1,4 +1,0 @@
-model:
-  hidden_dims: [1024, 512, 256]
-training:
-  loss: "mse"
