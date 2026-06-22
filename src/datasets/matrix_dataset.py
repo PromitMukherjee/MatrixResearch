@@ -34,9 +34,15 @@ class DynamicMatrixDataset(Dataset):
             A_v = torch.randn(self.rank, self.size, generator=gen)
             A = A_u @ A_v
             
+            if A.std() > 0:
+                A = A / A.std()
+            
             B_u = torch.randn(self.size, self.rank, generator=gen)
             B_v = torch.randn(self.rank, self.size, generator=gen)
             B = B_u @ B_v
+            
+            if B.std() > 0:
+                B = B / B.std()
         else:
             raise ValueError(f"Unknown matrix type: {self.matrix_type}")
             
