@@ -17,6 +17,7 @@ from src.models.autoencoder import MatrixAutoencoder
 from src.training.trainer import BaseTrainer
 from src.utils.config_loader import load_experiment_config
 from src.utils.seed import set_seed
+from src.utils.research_smoke_test import run_research_smoke_test
 
 class AutoencoderTrainer(BaseTrainer):
     def training_step(self, batch):
@@ -83,6 +84,18 @@ def run_autoencoder_training(size=32, latent_dim=128):
     config = load_experiment_config("configs/default.yaml", "configs/autoencoder.yaml")
     set_seed(42)
     
+    # --- Research Smoke Test ---
+    train_matrix_type = config['data'].get('matrix_type', 'low_rank')
+    smoke_passed = run_research_smoke_test(
+        size=size,
+        latent_dim=latent_dim,
+        matrix_type=train_matrix_type,
+        rank=4
+    )
+    if not smoke_passed:
+        print("\nABORTING: Smoke test failed. Fix issues above before launching full training.")
+        return None
+    
     # --- GPU Diagnostics ---
     print("\n--- GPU Diagnostics ---")
     print(f"CUDA Available : {torch.cuda.is_available()}")
@@ -93,7 +106,6 @@ def run_autoencoder_training(size=32, latent_dim=128):
     else:
         print("WARNING: CUDA is not available. Training will be slow on CPU.")
     
-    train_matrix_type = config['data'].get('matrix_type', 'low_rank')
     val_matrix_type = config['data'].get('matrix_type', 'low_rank')
     
     # --- Experiment Metadata Logging ---
