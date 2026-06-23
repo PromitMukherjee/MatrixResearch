@@ -1,0 +1,9 @@
+dataset_type: "fixed"
+matrix_type: "low_rank"
+samples: 1000
+epochs: 100
+
+size: 16
+rank: 4
+
+latent_dim: 512
