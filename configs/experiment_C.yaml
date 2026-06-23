@@ -1,0 +1,5 @@
+dataset_type: "fixed"
+matrix_type: "low_rank"
+samples: 10000
+epochs: 100
+latent_dim: 128

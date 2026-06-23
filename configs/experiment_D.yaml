@@ -1,0 +1,5 @@
+dataset_type: "dynamic"
+matrix_type: "low_rank"
+samples: 100000
+epochs: 100
+latent_dim: 128
